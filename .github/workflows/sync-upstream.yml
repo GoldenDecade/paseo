@@ -5,6 +5,9 @@ on:
     - cron: '0 15 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -21,8 +24,15 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/getpaseo/paseo.git
           git fetch upstream main
-          git merge --ff-only upstream/main || {
-            echo "::error::Merge conflict or non-fast-forward detected. Manual intervention required (do NOT force push)."
+
+          if git merge --ff-only upstream/main; then
+            echo "Fast-forward sync succeeded."
+          elif git rebase upstream/main; then
+            echo "Rebased local commits onto upstream/main."
+          else
+            echo "::error::Rebase failed with conflicts. Manual intervention required."
+            git rebase --abort
             exit 1
-          }
-          git push origin main
+          fi
+
+          git push --force-with-lease origin main
